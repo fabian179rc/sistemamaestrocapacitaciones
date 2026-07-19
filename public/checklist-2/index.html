@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema Maestro de Capacitaciones HyS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Suprimir advertencia de desarrollo
+      const originalConsoleError = console.error;
+      console.error = function (...args) {
+        if (
+          args[0] &&
+          args[0].includes &&
+          args[0].includes("cdn.tailwindcss.com")
+        ) {
+          return; // Ignorar la advertencia de Tailwind
+        }
+        originalConsoleError.apply(console, args);
+      };
+    </script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+      .checklist-item-yes {
+        @apply bg-green-100 border-green-300;
+      }
+      .checklist-item-no {
+        @apply bg-red-100 border-red-300;
+      }
+      .checklist-item-pending {
+        @apply bg-yellow-100 border-yellow-300;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      const ChecklistApp = () => {
+        const [activeTab, setActiveTab] = useState("client-info");
+        const [selectedChecklist, setSelectedChecklist] = useState("legal");
+        const [clientData, setClientData] = useState({
+          company: "",
+          cuit: "",
+          address: "",
+          phone: "",
+          email: "",
+          sector: "",
+          workers: "",
+          visitDate: new Date().toISOString().split("T")[0],
+          inspector: "",
+        });
+
+        const [checklistItems, setChecklistItems] = useState({});
+        const [observations, setObservations] = useState("");
+
+        const checklists = {
+          legal: {
+            name: "Checklist de Respaldo Legal",
+            items: [
+              "Capacitación fundamentada en la Ley 19.587 de Higiene y Seguridad en el Trabajo",
+              "Contenidos alineados al Decreto Reglamentario 351/79",
+              "Cumplimiento de la normativa SRT vigente aplicable a la actividad",
+              "Registro de asistencia firmado por cada participante",
+              "Firma del instructor/capacitador en cada documento generado",
+              "Firma del responsable de Higiene y Seguridad en los registros clave",
+              "Firma del representante de la empresa en actas y registros",
+              "DNI de cada participante registrado correctamente",
+              "Fecha, duración y modalidad documentadas en cada capacitación",
+              "Evaluación de conocimientos con resultado registrado",
+              "Certificado de capacitación emitido y archivado",
+              "Documentación conservada según el plazo legal de resguardo",
+              "Legajo de capacitación completo y ordenado por empresa",
+              "Documentación disponible para su exhibición ante auditoría o inspección",
+              "Datos de la empresa (razón social, CUIT, domicilio) correctos en cada documento",
+              "Trazabilidad completa entre convocatoria, asistencia, evaluación y certificado",
+            ],
+          },
+          seguimiento: {
+            name: "Checklist de Gestión y Seguimiento",
+            items: [
+              "Acta de Entrega de Material completada y firmada",
+              "Constancia de Recepción del Material firmada por el participante",
+              "Legajo de Capacitación armado y actualizado",
+              "Índice del Legajo de Capacitación elaborado y aprobado",
+              "Lista de Documentación Obligatoria revisada y vigente",
+              "Registro de Entrega de EPP durante la capacitación completado",
+              "Devolución de EPP registrada cuando corresponde",
+              "Registro Fotográfico de la capacitación archivado",
+              "Registro Maestro de Evidencias actualizado",
+              "Evidencias almacenadas en formato digital (PDF/JPG/PNG/XLSX)",
+              "Ubicación del legajo identificada y accesible",
+              "Período del legajo (desde/hasta) definido correctamente",
+              "Legajo revisado y aprobado por el responsable de Higiene y Seguridad",
+            ],
+          },
+          profesional: {
+            name: "Checklist de Gestión Profesional",
+            items: [
+              "Checklist Pre-Capacitación completado antes de cada instancia",
+              "Checklist Post-Capacitación completado al finalizar cada instancia",
+              "Bitácora del Instructor completada por capacitación",
+              "Informe de Capacitación Realizada elaborado y firmado",
+              "Recuperatorio de Capacitación gestionado para los ausentes",
+              "Registro de Empresas actualizado con datos completos",
+              "Registro de No Asistentes completado con motivo de ausencia",
+              "Registro de Trabajadores Capacitados actualizado",
+              "Seguimiento de Acciones Correctivas en curso o cerrado",
+              "Seguimiento de Capacitaciones Pendientes revisado y priorizado",
+              "Necesidades de capacitación futuras identificadas y documentadas",
+            ],
+          },
+          tecnicos: {
+            name: "Checklist de Formularios Técnicos",
+            items: [
+              "Agenda Anual de Capacitaciones elaborada y aprobada",
+              "Agenda Mensual de Capacitaciones actualizada",
+              "Calendario de Capacitaciones completo por tipo y mes",
+              "Dashboard de Capacitaciones actualizado con datos del período",
+              "KPI de Cumplimiento calculado y comparado contra la meta",
+              "Matriz de Estado por Empresa actualizada",
+              "Seguimiento de Auditorías registrado con hallazgos y acciones",
+              "Estados de auditoría (planificada/en ejecución/cerrada) al día",
+              "Empresas en estado crítico identificadas y priorizadas",
+            ],
+          },
+          indispensable: {
+            name: "Checklist de Documentación Indispensable",
+            items: [
+              "Planilla de Asistencia firmada por todos los participantes",
+              "Plan Anual de Capacitación aprobado por la empresa",
+              "Matriz de Capacitación por Puesto actualizada",
+              "Cronograma Anual de Capacitaciones actualizado",
+              "Registro Maestro de Capacitaciones completo",
+              "Acta de Capacitación firmada por instructor, responsable de H y S y empresa",
+              "Evaluación de Conocimientos aplicada a los participantes",
+              "Respuestas de la Evaluación disponibles para su corrección",
+              "Certificado de Capacitación emitido a cada participante aprobado",
+              "Ficha Técnica de Capacitación completa",
+              "Guión del Instructor elaborado por módulo",
+              "Encuesta de Satisfacción aplicada y resultados registrados",
+              "Observaciones de la Capacitación registradas",
+              "Registro de Mejoras Detectadas completado y con acciones asignadas",
+            ],
+          },
+        };
+
+        useEffect(() => {
+          const saved = localStorage.getItem("checklistDataCapacitaciones");
+          if (saved) {
+            const data = JSON.parse(saved);
+            setClientData(data.clientData);
+            setChecklistItems(data.checklistItems);
+            setObservations(data.observations);
+            setSelectedChecklist(data.selectedChecklist || "legal");
+          }
+        }, []);
+
+        useEffect(() => {
+          localStorage.setItem(
+            "checklistDataCapacitaciones",
+            JSON.stringify({
+              clientData,
+              checklistItems,
+              observations,
+              selectedChecklist,
+            }),
+          );
+        }, [clientData, checklistItems, observations, selectedChecklist]);
+
+        const handleClientDataChange = (field, value) => {
+          setClientData((prev) => ({ ...prev, [field]: value }));
+        };
+
+        const handleChecklistItemChange = (index, value) => {
+          const currentList = checklistItems[selectedChecklist] || {};
+          setChecklistItems((prev) => ({
+            ...prev,
+            [selectedChecklist]: { ...currentList, [index]: value },
+          }));
+        };
+
+        const generatePDF = () => {
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF("l", "mm", "a4"); // landscape
+
+          let yPosition = 15;
+
+          // Título
+          doc.setFontSize(18);
+          doc.setTextColor(30, 64, 175); // Azul
+          doc.text("SISTEMA MAESTRO DE CAPACITACIONES HyS", 148, yPosition, {
+            align: "center",
+          });
+          yPosition += 8;
+
+          doc.setFontSize(10);
+          doc.setTextColor(100, 100, 100);
+          doc.text("Reporte de Checklist", 148, yPosition, {
+            align: "center",
+          });
+          yPosition += 12;
+
+          // Línea separadora
+          doc.setDrawColor(30, 64, 175);
+          doc.setLineWidth(0.5);
+          doc.line(10, yPosition - 2, 286, yPosition - 2);
+          yPosition += 5;
+
+          // Datos del cliente
+          doc.setFontSize(10);
+          doc.setTextColor(30, 64, 175);
+          doc.text("DATOS DEL CLIENTE", 10, yPosition);
+          yPosition += 6;
+
+          doc.setFontSize(9);
+          doc.setTextColor(0, 0, 0);
+          doc.text(
+            `Empresa: ${clientData.company || "N/A"} | CUIT: ${clientData.cuit || "N/A"} | Fecha: ${clientData.visitDate || "N/A"} | Responsable de H y S: ${clientData.inspector || "N/A"}`,
+            10,
+            yPosition,
+          );
+          yPosition += 5;
+          doc.text(
+            `Domicilio: ${clientData.address || "N/A"} | Teléfono: ${clientData.phone || "N/A"} | Email: ${clientData.email || "N/A"} | Sector: ${clientData.sector || "N/A"}`,
+            10,
+            yPosition,
+          );
+          yPosition += 8;
+
+          // Nombre del checklist
+          doc.setFontSize(10);
+          doc.setTextColor(30, 64, 175);
+          doc.text(
+            `CHECKLIST: ${checklists[selectedChecklist].name}`,
+            10,
+            yPosition,
+          );
+          yPosition += 8;
+
+          // Preparar datos para la tabla
+          const tableData = checklists[selectedChecklist].items.map(
+            (item, index) => {
+              const status =
+                checklistItems[selectedChecklist]?.[index] || "pending";
+              let statusText = "N/A";
+
+              if (status === "yes") {
+                statusText = "SÍ";
+              } else if (status === "no") {
+                statusText = "NO";
+              }
+
+              return [(index + 1).toString(), item, statusText];
+            },
+          );
+
+          // Generar tabla
+          doc.autoTable({
+            head: [["N°", "ITEM DE VERIFICACIÓN", "ESTADO"]],
+            body: tableData,
+            startY: yPosition,
+            margin: { left: 10, right: 10 },
+            columnStyles: {
+              0: { cellWidth: 15, halign: "center", fontStyle: "bold" },
+              1: { cellWidth: 240, halign: "left" },
+              2: {
+                cellWidth: 25,
+                halign: "center",
+                fontStyle: "bold",
+                fontSize: 11,
+              },
+            },
+            headStyles: {
+              fillColor: [30, 64, 175],
+              textColor: [255, 255, 255],
+              fontStyle: "bold",
+              fontSize: 10,
+              halign: "center",
+              cellPadding: 5,
+            },
+            bodyStyles: {
+              fontSize: 9,
+              cellPadding: 4,
+              lineColor: [51, 51, 51],
+              fillColor: [255, 255, 255],
+            },
+            didParseCell: (data) => {
+              // Colorear solo el texto de la columna ESTADO (index 2)
+              if (data.section === "body" && data.column.index === 2) {
+                const statusText = data.cell.raw;
+
+                if (statusText === "SÍ") {
+                  data.cell.styles.textColor = [76, 175, 80]; // Verde
+                } else if (statusText === "NO") {
+                  data.cell.styles.textColor = [244, 67, 54]; // Rojo
+                } else if (statusText === "N/A") {
+                  data.cell.styles.textColor = [255, 152, 0]; // Naranja
+                }
+                data.cell.styles.fontStyle = "bold";
+                data.cell.styles.fontSize = 10;
+              }
+            },
+            pageBreak: "auto",
+          });
+
+          // Si hay observaciones, agregarlas en una nueva página si es necesario
+          if (observations) {
+            let finalY = doc.lastAutoTable.finalY + 10;
+
+            if (finalY > 240) {
+              doc.addPage();
+              finalY = 15;
+            }
+
+            doc.setFontSize(11);
+            doc.setTextColor(220, 38, 38); // Rojo
+            doc.setFont(undefined, "bold");
+            doc.text("OBSERVACIONES", 10, finalY);
+            doc.setFont(undefined, "normal");
+            finalY += 8;
+
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            const obsLines = doc.splitTextToSize(observations, 276);
+            doc.text(obsLines, 10, finalY);
+          }
+
+          // Pie de página en cada página con leyenda
+          const pageCount = doc.internal.pages.length - 1;
+          for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const bottomY = pageHeight - 10;
+
+            doc.text("Leyenda de Estados:", 10, bottomY);
+            doc.text(
+              "SÍ = Cumple | NO = No Cumple | N/A = No Aplica",
+              10,
+              bottomY + 4,
+            );
+            doc.text(
+              `Reporte generado el ${new Date().toLocaleDateString("es-AR")} a las ${new Date().toLocaleTimeString("es-AR")}`,
+              148,
+              bottomY + 4,
+              { align: "center" },
+            );
+          }
+
+          doc.save(
+            `checklist-capacitaciones-${clientData.company || "reporte"}-${clientData.visitDate}.pdf`,
+          );
+        };
+
+        const currentItems = checklists[selectedChecklist].items;
+        const currentChecks = checklistItems[selectedChecklist] || {};
+
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div className="mb-4">
+                  <h1 className="text-3xl font-bold text-indigo-600">
+                    Sistema Maestro de Capacitaciones HyS
+                  </h1>
+                  <p className="text-gray-600">
+                    Checklist de Documentación y Gestión de Capacitaciones
+                  </p>
+                </div>
+
+                <div className="flex gap-2 border-b border-gray-200 mb-6">
+                  <button
+                    onClick={() => setActiveTab("client-info")}
+                    className={`px-4 py-2 font-medium border-b-2 transition ${
+                      activeTab === "client-info"
+                        ? "border-indigo-600 text-indigo-600"
+                        : "border-transparent text-gray-600 hover:text-gray-800"
+                    }`}
+                  >
+                    Datos del Cliente
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("checklist")}
+                    className={`px-4 py-2 font-medium border-b-2 transition ${
+                      activeTab === "checklist"
+                        ? "border-indigo-600 text-indigo-600"
+                        : "border-transparent text-gray-600 hover:text-gray-800"
+                    }`}
+                  >
+                    Checklist
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                {activeTab === "client-info" && (
+                  <div className="space-y-4">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">
+                      Información del Cliente
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { key: "company", label: "Empresa" },
+                        { key: "cuit", label: "CUIT" },
+                        { key: "address", label: "Domicilio" },
+                        { key: "phone", label: "Teléfono" },
+                        { key: "email", label: "Email" },
+                        { key: "sector", label: "Sector/Área" },
+                        { key: "workers", label: "Cantidad de trabajadores" },
+                        {
+                          key: "visitDate",
+                          label: "Fecha de revisión",
+                          type: "date",
+                        },
+                        {
+                          key: "inspector",
+                          label: "Responsable de Higiene y Seguridad",
+                          md: "md:col-span-2",
+                        },
+                      ].map((field) => (
+                        <div key={field.key} className={field.md || ""}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {field.label}
+                          </label>
+                          <input
+                            type={field.type || "text"}
+                            value={clientData[field.key]}
+                            onChange={(e) =>
+                              handleClientDataChange(field.key, e.target.value)
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "checklist" && (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-blue-800 font-medium">
+                        💡 Selecciona un checklist, completa los items y
+                        descarga el PDF al final.
+                      </p>
+                    </div>
+
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Seleccionar Checklist
+                      </label>
+                      <select
+                        value={selectedChecklist}
+                        onChange={(e) => setSelectedChecklist(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      >
+                        {Object.entries(checklists).map(([key, value]) => (
+                          <option key={key} value={key}>
+                            {value.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">
+                      {checklists[selectedChecklist].name}
+                    </h2>
+
+                    <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded p-4">
+                      {currentItems.map((item, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded"
+                        >
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button
+                              onClick={() =>
+                                handleChecklistItemChange(index, "yes")
+                              }
+                              className={`px-2 py-1 rounded text-sm font-medium transition ${
+                                currentChecks[index] === "yes"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-gray-200 text-gray-700 hover:bg-green-200"
+                              }`}
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleChecklistItemChange(index, "no")
+                              }
+                              className={`px-2 py-1 rounded text-sm font-medium transition ${
+                                currentChecks[index] === "no"
+                                  ? "bg-red-500 text-white"
+                                  : "bg-gray-200 text-gray-700 hover:bg-red-200"
+                              }`}
+                            >
+                              ✗
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleChecklistItemChange(index, "pending")
+                              }
+                              className={`px-2 py-1 rounded text-sm font-medium transition ${
+                                currentChecks[index] === "pending" ||
+                                !currentChecks[index]
+                                  ? "bg-yellow-500 text-white"
+                                  : "bg-gray-200 text-gray-700 hover:bg-yellow-200"
+                              }`}
+                            >
+                              ○
+                            </button>
+                          </div>
+                          <span className="text-gray-700 text-sm flex-1">
+                            {item}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Observaciones
+                      </label>
+                      <textarea
+                        value={observations}
+                        onChange={(e) => setObservations(e.target.value)}
+                        rows="4"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Escriba observaciones adicionales..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {activeTab === "checklist" && (
+                <div className="mt-8 flex gap-4 justify-center flex-wrap border-t pt-6">
+                  <button
+                    onClick={generatePDF}
+                    className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-bold text-lg shadow-lg"
+                  >
+                    📥 Descargar PDF de esta sección
+                  </button>
+                </div>
+              )}
+
+              {activeTab === "client-info" && (
+                <div className="mt-6 flex gap-4 justify-center flex-wrap">
+                  <p className="text-sm text-gray-600 w-full text-center">
+                    💡 Los datos se guardan automáticamente
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-6 flex gap-4 justify-center flex-wrap">
+                <button
+                  onClick={() => {
+                    if (
+                      confirm("¿Estás seguro? Se borrarán todos los datos.")
+                    ) {
+                      localStorage.clear();
+                      setClientData({
+                        company: "",
+                        cuit: "",
+                        address: "",
+                        phone: "",
+                        email: "",
+                        sector: "",
+                        workers: "",
+                        visitDate: new Date().toISOString().split("T")[0],
+                        inspector: "",
+                      });
+                      setChecklistItems({});
+                      setObservations("");
+                      alert("Datos borrados correctamente");
+                    }
+                  }}
+                  className="px-6 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition font-medium"
+                >
+                  🗑️ Limpiar Todo
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<ChecklistApp />);
+    </script>
+  </body>
+</html>
